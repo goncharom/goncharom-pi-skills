@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Miru plan</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #171717;
+      --muted: #666666;
+      --border: #d9d9d9;
+      --accent: #171717;
+      --accent-fg: #ffffff;
+      --surface: #fafafa;
+      --comment: #d9d9d9;
+      --radius: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f10;
+        --fg: #f5f5f5;
+        --muted: #a3a3a3;
+        --border: #333333;
+        --accent: #f5f5f5;
+        --accent-fg: #121212;
+        --surface: #18181b;
+        --comment: #3a3a3a;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 16px 14px 28px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      line-height: 1.2;
+    }
+
+    .meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      white-space: pre-wrap;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.88rem;
+      padding: 6px 10px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-fg);
+      font-weight: 600;
+    }
+
+    #status {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    #plan-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .line {
+      padding: 1px 0 2px;
+    }
+
+    .line.has-comment {
+      background: var(--surface);
+    }
+
+    .line-main {
+      display: grid;
+      grid-template-columns: 18px 3ch 1fr;
+      align-items: start;
+      gap: 6px;
+    }
+
+    .comment-toggle {
+      width: 16px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0;
+      border-radius: 999px;
+      line-height: 1;
+      font-size: 0.7rem;
+    }
+
+    .line.has-comment .comment-toggle {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-fg);
+    }
+
+    .line-number {
+      width: 3ch;
+      padding-top: 1px;
+      text-align: right;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.76rem;
+      user-select: none;
+    }
+
+    .line-text {
+      margin: 0;
+      min-height: 1.15em;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.2;
+      font-size: 0.86rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      cursor: pointer;
+    }
+
+    .comment-box {
+      margin-top: 2px;
+      margin-left: calc(18px + 3ch + 12px);
+      padding-left: 6px;
+      border-left: 1px solid var(--comment);
+    }
+
+    .comment-box[hidden] {
+      display: none;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 52px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      padding: 5px 7px;
+      font: inherit;
+      font-size: 0.84rem;
+      line-height: 1.25;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 640px) {
+      .line-main {
+        grid-template-columns: 16px 1fr;
+      }
+
+      .line-number {
+        display: none;
+      }
+
+      .comment-box {
+        margin-left: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1 id="plan-title">Miru plan</h1>
+        <div id="plan-meta" class="meta"></div>
+      </div>
+      <div class="actions">
+        <button id="done-button" class="primary" type="button">Done: Save comments + Copy</button>
+        <span id="status" aria-live="polite"></span>
+      </div>
+    </header>
+
+    <section id="plan-lines" aria-label="Plan lines"></section>
+  </main>
+
+  <script id="plan-data" type="application/json">
+__PLAN_DATA_JSON__
+  </script>
+  <script>
+    (() => {
+      const data = JSON.parse(document.getElementById('plan-data').textContent);
+      const titleEl = document.getElementById('plan-title');
+      const metaEl = document.getElementById('plan-meta');
+      const linesEl = document.getElementById('plan-lines');
+      const doneButton = document.getElementById('done-button');
+      const statusEl = document.getElementById('status');
+
+      const planTitle = data.title || 'Miru plan';
+      const planLines = Array.isArray(data.planLines) && data.planLines.length ? data.planLines : [''];
+      const storageKey = getStorageKey();
+      const state = { comments: loadComments() };
+
+      titleEl.textContent = planTitle;
+      document.title = `${planTitle} · Miru plan`;
+
+      const metaLines = [];
+      if (data.generatedAt) metaLines.push(`Generated: ${String(data.generatedAt).replace('_', ' ')}`);
+      if (data.sourcePath) metaLines.push(`Source: ${data.sourcePath}`);
+      metaEl.textContent = metaLines.join('\n');
+
+      renderLines(planLines);
+
+      doneButton.addEventListener('click', async () => {
+        saveComments(false);
+        const clipboardText = buildClipboardText(planLines);
+        const copied = await copyToClipboard(clipboardText);
+        if (copied) {
+          setStatus('Saved comments and copied plan to clipboard.');
+        } else {
+          setStatus('Saved comments, but clipboard copy failed in this browser.', true);
+        }
+      });
+
+      function getStorageKey() {
+        const pathPart = window.location.pathname || data.sourcePath || planTitle;
+        return `miru-plan-comments:${pathPart}`;
+      }
+
+      function loadComments() {
+        try {
+          const raw = window.localStorage.getItem(storageKey);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed.comments === 'object' && parsed.comments ? parsed.comments : {};
+        } catch (_error) {
+          return {};
+        }
+      }
+
+      function saveComments(quiet) {
+        const comments = {};
+
+        document.querySelectorAll('textarea[data-line]').forEach((textarea) => {
+          const value = textarea.value.replace(/\r\n/g, '\n');
+          if (value.trim()) comments[textarea.dataset.line] = value;
+        });
+
+        state.comments = comments;
+
+        try {
+          const payload = {
+            version: 1,
+            title: planTitle,
+            sourcePath: data.sourcePath || '',
+            updatedAt: new Date().toISOString(),
+            comments,
+          };
+          window.localStorage.setItem(storageKey, JSON.stringify(payload));
+          updateCommentState();
+          if (!quiet) setStatus('Comments saved.');
+          return true;
+        } catch (_error) {
+          if (!quiet) setStatus('Unable to save comments locally in this browser.', true);
+          return false;
+        }
+      }
+
+      function renderLines(lines) {
+        linesEl.innerHTML = '';
+
+        lines.forEach((lineText, index) => {
+          const lineNumber = index + 1;
+          const existingComment = state.comments[String(lineNumber)] || '';
+
+          const lineEl = document.createElement('article');
+          lineEl.className = 'line';
+          lineEl.dataset.line = String(lineNumber);
+          if (existingComment.trim()) lineEl.classList.add('has-comment');
+
+          const lineMain = document.createElement('div');
+          lineMain.className = 'line-main';
+
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'comment-toggle';
+          toggle.dataset.line = String(lineNumber);
+          toggle.setAttribute('aria-label', `Toggle comment for line ${lineNumber}`);
+          toggle.title = `Toggle comment for line ${lineNumber}`;
+          toggle.textContent = existingComment.trim() ? '💬' : '+';
+
+          const number = document.createElement('div');
+          number.className = 'line-number';
+          number.textContent = String(lineNumber);
+
+          const text = document.createElement('pre');
+          text.className = 'line-text';
+          text.textContent = lineText.length ? lineText : ' ';
+          text.title = `Click to comment on line ${lineNumber}`;
+
+          const commentBox = document.createElement('div');
+          commentBox.className = 'comment-box';
+          commentBox.hidden = !existingComment.trim();
+
+          const label = document.createElement('label');
+          label.className = 'sr-only';
+          label.htmlFor = `comment-${lineNumber}`;
+          label.textContent = `Comment for line ${lineNumber}`;
+
+          const textarea = document.createElement('textarea');
+          textarea.id = `comment-${lineNumber}`;
+          textarea.dataset.line = String(lineNumber);
+          textarea.placeholder = `Comment for line ${lineNumber}`;
+          textarea.value = existingComment;
+
+          toggle.addEventListener('click', () => {
+            commentBox.hidden = !commentBox.hidden;
+            if (!commentBox.hidden) textarea.focus();
+          });
+
+          text.addEventListener('click', () => {
+            commentBox.hidden = false;
+            textarea.focus();
+          });
+
+          textarea.addEventListener('input', () => {
+            const hasComment = textarea.value.trim().length > 0;
+            lineEl.classList.toggle('has-comment', hasComment);
+            toggle.textContent = hasComment ? '💬' : '+';
+            saveComments(true);
+          });
+
+          commentBox.append(label, textarea);
+          lineMain.append(toggle, number, text);
+          lineEl.append(lineMain, commentBox);
+          linesEl.append(lineEl);
+        });
+      }
+
+      function updateCommentState() {
+        document.querySelectorAll('.line').forEach((lineEl) => {
+          const lineNumber = lineEl.dataset.line;
+          const hasComment = Boolean(state.comments[lineNumber] && state.comments[lineNumber].trim());
+          lineEl.classList.toggle('has-comment', hasComment);
+          const toggle = lineEl.querySelector('.comment-toggle');
+          if (toggle) toggle.textContent = hasComment ? '💬' : '+';
+        });
+      }
+
+      function buildClipboardText(lines) {
+        const output = [];
+        output.push(`# ${planTitle}`);
+        if (data.generatedAt) output.push(`Generated: ${String(data.generatedAt).replace('_', ' ')}`);
+        if (data.sourcePath) output.push(`Source: ${data.sourcePath}`);
+        output.push('');
+
+        lines.forEach((lineText, index) => {
+          const lineNumber = index + 1;
+          const comment = state.comments[String(lineNumber)];
+          output.push(`${String(lineNumber).padStart(3, ' ')} | ${lineText}`);
+          if (comment && comment.trim()) {
+            output.push(`    [Comment @ line ${lineNumber}]`);
+            comment.replace(/\r\n/g, '\n').split('\n').forEach((commentLine) => {
+              output.push(`    ${commentLine}`);
+            });
+          }
+        });
+
+        return output.join('\n');
+      }
+
+      async function copyToClipboard(text) {
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            return true;
+          }
+        } catch (_error) {
+          // Fall through to legacy copy.
+        }
+
+        const fallback = document.createElement('textarea');
+        fallback.value = text;
+        fallback.setAttribute('readonly', 'readonly');
+        fallback.style.position = 'fixed';
+        fallback.style.opacity = '0';
+        fallback.style.pointerEvents = 'none';
+        document.body.appendChild(fallback);
+        fallback.focus();
+        fallback.select();
+
+        try {
+          return document.execCommand('copy');
+        } catch (_error) {
+          return false;
+        } finally {
+          fallback.remove();
+        }
+      }
+
+      function setStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.style.color = isError ? 'crimson' : '';
+      }
+    })();
+  </script>
+</body>
+</html>

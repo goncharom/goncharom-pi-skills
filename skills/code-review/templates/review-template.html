@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Miru code review</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #171717;
+      --muted: #666666;
+      --border: #d9d9d9;
+      --accent: #171717;
+      --accent-fg: #ffffff;
+      --surface: #fafafa;
+      --comment: #d9d9d9;
+      --add-bg: rgba(22, 163, 74, 0.08);
+      --delete-bg: rgba(220, 38, 38, 0.08);
+      --hunk-bg: rgba(23, 23, 23, 0.04);
+      --radius: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f10;
+        --fg: #f5f5f5;
+        --muted: #a3a3a3;
+        --border: #333333;
+        --accent: #f5f5f5;
+        --accent-fg: #121212;
+        --surface: #18181b;
+        --comment: #3a3a3a;
+        --add-bg: rgba(34, 197, 94, 0.14);
+        --delete-bg: rgba(239, 68, 68, 0.14);
+        --hunk-bg: rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 14px 28px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      line-height: 1.2;
+    }
+
+    .meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      white-space: pre-wrap;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.88rem;
+      padding: 6px 10px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-fg);
+      font-weight: 600;
+    }
+
+    #status {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .nav-card {
+      position: sticky;
+      top: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+      max-height: calc(100vh - 32px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nav-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-title {
+      margin: 0;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .nav-summary {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.25;
+    }
+
+    #file-nav {
+      padding: 6px;
+      overflow: auto;
+      min-height: 72px;
+    }
+
+    .file-link {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: start;
+      gap: 8px;
+      width: 100%;
+      padding: 7px 8px;
+      border-radius: 8px;
+      color: inherit;
+      text-decoration: none;
+      padding-left: calc(8px + min(var(--depth), 6) * 10px);
+    }
+
+    .file-link:hover {
+      background: rgba(127, 127, 127, 0.08);
+    }
+
+    .file-link-status,
+    .file-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.5em;
+      height: 1.5em;
+      padding: 0 0.3em;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.72rem;
+      line-height: 1;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: var(--bg);
+    }
+
+    .file-link-main {
+      min-width: 0;
+    }
+
+    .file-link-path {
+      display: block;
+      font-size: 0.8rem;
+      line-height: 1.2;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .file-link-meta,
+    .file-meta {
+      color: var(--muted);
+      font-size: 0.73rem;
+      line-height: 1.2;
+      margin-top: 2px;
+    }
+
+    .file-link-counts,
+    .file-counts {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      white-space: nowrap;
+    }
+
+    #review-content {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .empty-state,
+    .file-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .empty-state {
+      padding: 16px;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .file-section {
+      scroll-margin-top: 16px;
+    }
+
+    .file-section.is-collapsed .file-head {
+      border-bottom: 0;
+    }
+
+    .file-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .file-path {
+      margin: 0;
+      font-size: 0.86rem;
+      line-height: 1.25;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .file-head-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .file-collapse-toggle {
+      padding: 4px 9px;
+      font-size: 0.76rem;
+      line-height: 1.2;
+    }
+
+    .file-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .file-body[hidden] {
+      display: none;
+    }
+
+    .row {
+      padding: 1px 8px 2px;
+    }
+
+    .row.has-comment {
+      background: var(--surface);
+    }
+
+    .row-add {
+      background: var(--add-bg);
+    }
+
+    .row-delete {
+      background: var(--delete-bg);
+    }
+
+    .row-hunk,
+    .row-note {
+      background: var(--hunk-bg);
+    }
+
+    .row-main,
+    .row-static-main {
+      display: grid;
+      grid-template-columns: 18px 4ch 4ch 2ch minmax(0, 1fr);
+      align-items: start;
+      gap: 6px;
+    }
+
+    .comment-toggle {
+      width: 16px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0;
+      border-radius: 999px;
+      line-height: 1;
+      font-size: 0.7rem;
+    }
+
+    .row.has-comment .comment-toggle {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-fg);
+    }
+
+    .static-spacer,
+    .line-number,
+    .marker {
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.76rem;
+      user-select: none;
+    }
+
+    .line-number {
+      text-align: right;
+      padding-top: 1px;
+    }
+
+    .marker {
+      padding-top: 1px;
+      text-align: center;
+    }
+
+    .code-wrap,
+    .static-text {
+      margin: 0;
+      min-height: 1.15em;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.25;
+      font-size: 0.84rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .code-wrap {
+      cursor: pointer;
+    }
+
+    .code-wrap code {
+      display: block;
+      margin: 0;
+      padding: 0 !important;
+      background: transparent !important;
+      white-space: inherit;
+      word-break: inherit;
+      font: inherit;
+      color: inherit;
+    }
+
+    .code-wrap code.hljs {
+      padding: 0 !important;
+      background: transparent !important;
+    }
+
+    .static-text {
+      color: var(--muted);
+    }
+
+    .comment-box {
+      margin-top: 2px;
+      margin-left: calc(18px + 4ch + 4ch + 2ch + 24px);
+      padding-left: 6px;
+      border-left: 1px solid var(--comment);
+    }
+
+    .comment-box[hidden] {
+      display: none;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      padding: 5px 7px;
+      font: inherit;
+      font-size: 0.84rem;
+      line-height: 1.25;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 960px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-card {
+        position: static;
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .row-main,
+      .row-static-main {
+        grid-template-columns: 16px 3ch 3ch 2ch minmax(0, 1fr);
+      }
+
+      .comment-box {
+        margin-left: calc(16px + 3ch + 3ch + 2ch + 24px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1 id="review-title">Miru code review</h1>
+        <div id="review-meta" class="meta"></div>
+      </div>
+      <div class="actions">
+        <button id="done-button" class="primary" type="button">Done: Save comments + Copy</button>
+        <span id="status" aria-live="polite"></span>
+      </div>
+    </header>
+
+    <div class="shell">
+      <aside>
+        <div class="nav-card">
+          <div class="nav-head">
+            <div class="nav-title">Changed files</div>
+            <div id="nav-summary" class="nav-summary"></div>
+          </div>
+          <nav id="file-nav" aria-label="Changed files"></nav>
+        </div>
+      </aside>
+
+      <section id="review-content" aria-label="Review content"></section>
+    </div>
+  </main>
+
+  <script id="review-data" type="application/json">
+__REVIEW_DATA_JSON__
+  </script>
+  <script>
+    (() => {
+      const data = JSON.parse(document.getElementById('review-data').textContent);
+      const titleEl = document.getElementById('review-title');
+      const metaEl = document.getElementById('review-meta');
+      const navSummaryEl = document.getElementById('nav-summary');
+      const navEl = document.getElementById('file-nav');
+      const reviewEl = document.getElementById('review-content');
+      const doneButton = document.getElementById('done-button');
+      const statusEl = document.getElementById('status');
+
+      const reviewTitle = data.title || 'Miru code review';
+      const files = Array.isArray(data.files) ? data.files : [];
+      const summary = data.summary || { fileCount: files.length, additions: 0, deletions: 0 };
+      const reviewMode = data.reviewMode || 'working-tree-vs-head-plus-untracked';
+      const storageKey = getStorageKey();
+      const storedState = loadStoredState();
+      const state = {
+        comments: storedState.comments,
+        collapsedFiles: storedState.collapsedFiles,
+      };
+
+      titleEl.textContent = reviewTitle;
+      document.title = `${reviewTitle} · Miru code review`;
+
+      const metaLines = [];
+      if (data.generatedAt) metaLines.push(`Generated: ${String(data.generatedAt).replace('_', ' ')}`);
+      if (data.sourcePath) metaLines.push(`Source: ${data.sourcePath}`);
+      if (data.repoPath) metaLines.push(`Repo: ${data.repoPath}`);
+      if (reviewMode) metaLines.push(`Review mode: ${reviewMode}`);
+      metaLines.push(`Summary: ${summary.fileCount || files.length} files, +${summary.additions || 0}, -${summary.deletions || 0}`);
+      metaEl.textContent = metaLines.join('\n');
+
+      navSummaryEl.textContent = `${summary.fileCount || files.length} files · +${summary.additions || 0} / -${summary.deletions || 0}`;
+
+      renderNav(files);
+      renderFiles(files);
+      highlightVisibleCode();
+      window.addEventListener('load', highlightVisibleCode);
+
+      doneButton.addEventListener('click', async () => {
+        saveComments(false);
+        const clipboardText = buildClipboardText(files);
+        const copied = await copyToClipboard(clipboardText);
+        if (copied) {
+          setStatus('Saved comments and copied review notes to clipboard.');
+        } else {
+          setStatus('Saved comments, but clipboard copy failed in this browser.', true);
+        }
+      });
+
+      function getStorageKey() {
+        const pathPart = window.location.pathname || data.sourcePath || reviewTitle;
+        const repoPart = data.repoPath || 'repo';
+        const modePart = reviewMode || 'review';
+        return `miru-review-comments:${repoPart}:${modePart}:${pathPart}`;
+      }
+
+      function loadStoredState() {
+        try {
+          const raw = window.localStorage.getItem(storageKey);
+          if (!raw) return { comments: {}, collapsedFiles: {} };
+          const parsed = JSON.parse(raw);
+          const comments = parsed && typeof parsed.comments === 'object' && parsed.comments ? parsed.comments : {};
+          const collapsedFiles = parsed && typeof parsed.collapsedFiles === 'object' && parsed.collapsedFiles ? parsed.collapsedFiles : {};
+          return { comments, collapsedFiles };
+        } catch (_error) {
+          return { comments: {}, collapsedFiles: {} };
+        }
+      }
+
+      function saveComments(quiet) {
+        const comments = {};
+
+        document.querySelectorAll('textarea[data-row-id]').forEach((textarea) => {
+          const value = textarea.value.replace(/\r\n/g, '\n');
+          if (value.trim()) comments[textarea.dataset.rowId] = value;
+        });
+
+        state.comments = comments;
+        return persistState(quiet);
+      }
+
+      function persistState(quiet) {
+        try {
+          const payload = {
+            version: 2,
+            title: reviewTitle,
+            sourcePath: data.sourcePath || '',
+            repoPath: data.repoPath || '',
+            reviewMode,
+            updatedAt: new Date().toISOString(),
+            comments: state.comments,
+            collapsedFiles: state.collapsedFiles,
+          };
+          window.localStorage.setItem(storageKey, JSON.stringify(payload));
+          updateCommentState();
+          if (!quiet) setStatus('Comments saved.');
+          return true;
+        } catch (_error) {
+          if (!quiet) setStatus('Unable to save comments locally in this browser.', true);
+          return false;
+        }
+      }
+
+      function renderNav(reviewFiles) {
+        navEl.innerHTML = '';
+
+        if (!reviewFiles.length) {
+          const empty = document.createElement('div');
+          empty.className = 'file-link-meta';
+          empty.textContent = 'No changed files.';
+          navEl.append(empty);
+          return;
+        }
+
+        reviewFiles.forEach((file) => {
+          const link = document.createElement('a');
+          link.className = 'file-link';
+          link.href = `#${file.id}`;
+          link.style.setProperty('--depth', String(getPathDepth(file.path)));
+
+          const status = document.createElement('span');
+          status.className = 'file-link-status';
+          status.textContent = getStatusCode(file.status);
+          status.title = formatStatus(file.status);
+
+          const main = document.createElement('span');
+          main.className = 'file-link-main';
+
+          const path = document.createElement('span');
+          path.className = 'file-link-path';
+          path.textContent = file.path || '(unknown path)';
+
+          const meta = document.createElement('span');
+          meta.className = 'file-link-meta';
+          meta.textContent = formatStatus(file.status);
+
+          const counts = document.createElement('span');
+          counts.className = 'file-link-counts';
+          counts.textContent = `+${file.additions || 0} -${file.deletions || 0}`;
+
+          main.append(path, meta);
+          link.append(status, main, counts);
+          link.addEventListener('click', () => {
+            setFileCollapsed(file.id, false, true);
+            window.setTimeout(() => flashFile(file.id), 10);
+          });
+          navEl.append(link);
+        });
+      }
+
+      function renderFiles(reviewFiles) {
+        reviewEl.innerHTML = '';
+
+        if (!reviewFiles.length) {
+          const empty = document.createElement('article');
+          empty.className = 'empty-state';
+          empty.textContent = data.emptyMessage || 'No changed files to review.';
+          reviewEl.append(empty);
+          return;
+        }
+
+        reviewFiles.forEach((file) => {
+          const section = document.createElement('article');
+          section.className = 'file-section';
+          section.id = file.id;
+
+          const isCollapsed = Boolean(state.collapsedFiles[file.id]);
+
+          const head = document.createElement('div');
+          head.className = 'file-head';
+
+          const headLeft = document.createElement('div');
+
+          const pathEl = document.createElement('h2');
+          pathEl.className = 'file-path';
+          pathEl.textContent = formatFileHeading(file);
+
+          const meta = document.createElement('div');
+          meta.className = 'file-meta';
+          meta.textContent = buildFileMeta(file);
+
+          headLeft.append(pathEl, meta);
+
+          const headRight = document.createElement('div');
+          headRight.className = 'file-head-right';
+
+          const collapseButton = document.createElement('button');
+          collapseButton.type = 'button';
+          collapseButton.className = 'file-collapse-toggle';
+          collapseButton.dataset.fileId = file.id;
+          collapseButton.setAttribute('aria-controls', `${file.id}-body`);
+          collapseButton.addEventListener('click', () => {
+            setFileCollapsed(file.id, !section.classList.contains('is-collapsed'), true);
+          });
+
+          const status = document.createElement('span');
+          status.className = 'file-status';
+          status.textContent = getStatusCode(file.status);
+          status.title = formatStatus(file.status);
+
+          const counts = document.createElement('span');
+          counts.className = 'file-counts';
+          counts.textContent = `+${file.additions || 0} -${file.deletions || 0}`;
+
+          headRight.append(collapseButton, status, counts);
+          head.append(headLeft, headRight);
+
+          const body = document.createElement('div');
+          body.className = 'file-body';
+          body.id = `${file.id}-body`;
+
+          (Array.isArray(file.rows) ? file.rows : []).forEach((row) => {
+            body.append(renderRow(file, row));
+          });
+
+          section.append(head, body);
+          reviewEl.append(section);
+          applyFileCollapsedState(file.id, isCollapsed);
+        });
+      }
+
+      function renderRow(file, row) {
+        if (!row || !row.kind) return document.createElement('div');
+        if (row.kind === 'hunk' || row.kind === 'note') return renderStaticRow(row);
+        return renderCommentableRow(file, row);
+      }
+
+      function renderStaticRow(row) {
+        const rowEl = document.createElement('div');
+        rowEl.className = `row row-${row.kind}`;
+
+        const main = document.createElement('div');
+        main.className = 'row-static-main';
+
+        const spacerA = document.createElement('span');
+        spacerA.className = 'static-spacer';
+        const spacerB = document.createElement('span');
+        spacerB.className = 'static-spacer';
+        const spacerC = document.createElement('span');
+        spacerC.className = 'static-spacer';
+        const spacerD = document.createElement('span');
+        spacerD.className = 'static-spacer';
+
+        const text = document.createElement('pre');
+        text.className = 'static-text';
+        text.textContent = row.text || ' ';
+
+        main.append(spacerA, spacerB, spacerC, spacerD, text);
+        rowEl.append(main);
+        return rowEl;
+      }
+
+      function renderCommentableRow(file, row) {
+        const existingComment = state.comments[row.id] || '';
+        const rowEl = document.createElement('article');
+        rowEl.className = `row row-${row.kind}`;
+        rowEl.dataset.rowId = row.id;
+        if (existingComment.trim()) rowEl.classList.add('has-comment');
+
+        const main = document.createElement('div');
+        main.className = 'row-main';
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'comment-toggle';
+        toggle.dataset.rowId = row.id;
+        toggle.setAttribute('aria-label', `Toggle comment for ${file.path} line ${getPreferredLine(row)}`);
+        toggle.title = `Toggle comment for ${file.path} line ${getPreferredLine(row)}`;
+        toggle.textContent = existingComment.trim() ? '💬' : '+';
+
+        const oldNumber = document.createElement('div');
+        oldNumber.className = 'line-number';
+        oldNumber.textContent = row.oldLineNo == null ? '' : String(row.oldLineNo);
+
+        const newNumber = document.createElement('div');
+        newNumber.className = 'line-number';
+        newNumber.textContent = row.newLineNo == null ? '' : String(row.newLineNo);
+
+        const marker = document.createElement('div');
+        marker.className = 'marker';
+        marker.textContent = row.marker || ' ';
+
+        const codeWrap = document.createElement('pre');
+        codeWrap.className = 'code-wrap';
+        codeWrap.title = `Click to comment on ${file.path} line ${getPreferredLine(row)}`;
+
+        const code = document.createElement('code');
+        code.dataset.highlightCode = '1';
+        if (file.language) code.className = `language-${file.language}`;
+        code.textContent = row.rawText != null && row.rawText.length ? row.rawText : ' ';
+        codeWrap.append(code);
+
+        const commentBox = document.createElement('div');
+        commentBox.className = 'comment-box';
+        commentBox.hidden = !existingComment.trim();
+
+        const label = document.createElement('label');
+        label.className = 'sr-only';
+        label.htmlFor = `comment-${row.id}`;
+        label.textContent = `Comment for ${file.path} line ${getPreferredLine(row)}`;
+
+        const textarea = document.createElement('textarea');
+        textarea.id = `comment-${row.id}`;
+        textarea.dataset.rowId = row.id;
+        textarea.placeholder = `Comment for ${file.path} line ${getPreferredLine(row)}`;
+        textarea.value = existingComment;
+
+        toggle.addEventListener('click', () => {
+          commentBox.hidden = !commentBox.hidden;
+          if (!commentBox.hidden) textarea.focus();
+        });
+
+        codeWrap.addEventListener('click', () => {
+          commentBox.hidden = false;
+          textarea.focus();
+        });
+
+        textarea.addEventListener('input', () => {
+          const hasComment = textarea.value.trim().length > 0;
+          rowEl.classList.toggle('has-comment', hasComment);
+          toggle.textContent = hasComment ? '💬' : '+';
+          saveComments(true);
+        });
+
+        commentBox.append(label, textarea);
+        main.append(toggle, oldNumber, newNumber, marker, codeWrap);
+        rowEl.append(main, commentBox);
+        return rowEl;
+      }
+
+      function updateCommentState() {
+        document.querySelectorAll('.row[data-row-id]').forEach((rowEl) => {
+          const rowId = rowEl.dataset.rowId;
+          const hasComment = Boolean(state.comments[rowId] && state.comments[rowId].trim());
+          rowEl.classList.toggle('has-comment', hasComment);
+          const toggle = rowEl.querySelector('.comment-toggle');
+          if (toggle) toggle.textContent = hasComment ? '💬' : '+';
+        });
+      }
+
+      function buildClipboardText(reviewFiles) {
+        const output = [];
+        output.push(`# ${reviewTitle}`);
+        if (data.generatedAt) output.push(`Generated: ${String(data.generatedAt).replace('_', ' ')}`);
+        if (data.sourcePath) output.push(`Source: ${data.sourcePath}`);
+        if (data.repoPath) output.push(`Repo: ${data.repoPath}`);
+        if (reviewMode) output.push(`Review mode: ${reviewMode}`);
+        output.push(`Summary: ${summary.fileCount || reviewFiles.length} files, +${summary.additions || 0}, -${summary.deletions || 0}`);
+        output.push('');
+
+        let wroteAny = false;
+
+        reviewFiles.forEach((file) => {
+          const fileRows = (Array.isArray(file.rows) ? file.rows : []).filter((row) => {
+            return row && row.id && state.comments[row.id] && state.comments[row.id].trim();
+          });
+
+          if (!fileRows.length) return;
+          wroteAny = true;
+          output.push(`## ${file.path}`);
+          output.push(`Status: ${formatStatus(file.status)} (+${file.additions || 0} / -${file.deletions || 0})`);
+          output.push('');
+
+          fileRows.forEach((row) => {
+            const comment = state.comments[row.id];
+            const preferred = getPreferredLine(row);
+            output.push(`[${file.path}] line:${preferred} old:${row.oldLineNo == null ? '-' : row.oldLineNo} new:${row.newLineNo == null ? '-' : row.newLineNo} marker:${row.marker || ' '}`);
+            output.push(`Code: ${row.rawText || ''}`);
+            output.push('Comment:');
+            comment.replace(/\r\n/g, '\n').split('\n').forEach((commentLine) => {
+              output.push(`  ${commentLine}`);
+            });
+            output.push('');
+          });
+        });
+
+        if (!wroteAny) output.push('(No comments.)');
+        return output.join('\n');
+      }
+
+      function applyFileCollapsedState(fileId, collapsed) {
+        const section = document.getElementById(fileId);
+        if (!section) return;
+
+        section.classList.toggle('is-collapsed', collapsed);
+
+        const body = section.querySelector('.file-body');
+        if (body) body.hidden = collapsed;
+
+        const button = section.querySelector('.file-collapse-toggle');
+        if (button) {
+          button.textContent = collapsed ? '▸ Expand' : '▾ Collapse';
+          button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          button.title = collapsed ? 'Expand file diff' : 'Collapse file diff';
+        }
+      }
+
+      function setFileCollapsed(fileId, collapsed, quiet) {
+        if (collapsed) state.collapsedFiles[fileId] = true;
+        else delete state.collapsedFiles[fileId];
+        applyFileCollapsedState(fileId, collapsed);
+        return persistState(quiet);
+      }
+
+      function highlightVisibleCode() {
+        if (!window.hljs || typeof window.hljs.highlightElement !== 'function') return;
+
+        document.querySelectorAll('code[data-highlight-code]').forEach((codeEl) => {
+          if (codeEl.dataset.hljsDone === '1') return;
+          if (!codeEl.className || !codeEl.className.includes('language-')) return;
+          try {
+            window.hljs.highlightElement(codeEl);
+            codeEl.dataset.hljsDone = '1';
+          } catch (_error) {
+            // Leave as plain code.
+          }
+        });
+      }
+
+      function formatFileHeading(file) {
+        if (file.status === 'renamed' && file.oldPath && file.newPath && file.oldPath !== file.newPath) {
+          return `${file.oldPath} → ${file.newPath}`;
+        }
+        return file.path || file.newPath || file.oldPath || '(unknown path)';
+      }
+
+      function buildFileMeta(file) {
+        const parts = [formatStatus(file.status)];
+        if (file.oldPath && file.newPath && file.oldPath !== file.newPath && file.status !== 'renamed') {
+          parts.push(`${file.oldPath} → ${file.newPath}`);
+        }
+        if (file.language) parts.push(`language: ${file.language}`);
+        return parts.join(' · ');
+      }
+
+      function formatStatus(status) {
+        switch (status) {
+          case 'added': return 'Added';
+          case 'deleted': return 'Deleted';
+          case 'renamed': return 'Renamed';
+          case 'untracked': return 'Untracked';
+          case 'binary': return 'Binary';
+          default: return 'Modified';
+        }
+      }
+
+      function getStatusCode(status) {
+        switch (status) {
+          case 'added': return 'A';
+          case 'deleted': return 'D';
+          case 'renamed': return 'R';
+          case 'untracked': return 'U';
+          case 'binary': return 'B';
+          default: return 'M';
+        }
+      }
+
+      function getPreferredLine(row) {
+        return row.newLineNo != null ? row.newLineNo : (row.oldLineNo != null ? row.oldLineNo : '-');
+      }
+
+      function getPathDepth(filePath) {
+        if (!filePath) return 0;
+        return Math.max(0, filePath.split('/').length - 1);
+      }
+
+      function flashFile(fileId) {
+        const target = document.getElementById(fileId);
+        if (!target) return;
+        target.style.transition = 'box-shadow 180ms ease';
+        target.style.boxShadow = '0 0 0 3px rgba(120, 120, 120, 0.28)';
+        window.setTimeout(() => {
+          target.style.boxShadow = 'none';
+        }, 1200);
+      }
+
+      async function copyToClipboard(text) {
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            return true;
+          }
+        } catch (_error) {
+          // Fall through to legacy copy.
+        }
+
+        const fallback = document.createElement('textarea');
+        fallback.value = text;
+        fallback.setAttribute('readonly', 'readonly');
+        fallback.style.position = 'fixed';
+        fallback.style.opacity = '0';
+        fallback.style.pointerEvents = 'none';
+        document.body.appendChild(fallback);
+        fallback.focus();
+        fallback.select();
+
+        try {
+          return document.execCommand('copy');
+        } catch (_error) {
+          return false;
+        } finally {
+          fallback.remove();
+        }
+      }
+
+      function setStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.style.color = isError ? 'crimson' : '';
+      }
+    })();
+  </script>
+</body>
+</html>
