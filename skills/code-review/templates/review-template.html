@@ -150,21 +150,21 @@
 
     #file-nav {
       padding: 6px;
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
       min-height: 72px;
     }
 
     .file-link {
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: start;
       gap: 8px;
       width: 100%;
-      padding: 7px 8px;
+      padding: 6px 8px;
       border-radius: 8px;
       color: inherit;
       text-decoration: none;
-      padding-left: calc(8px + min(var(--depth), 6) * 10px);
     }
 
     .file-link:hover {
@@ -190,13 +190,19 @@
 
     .file-link-main {
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
     .file-link-path {
       display: block;
       font-size: 0.8rem;
       line-height: 1.2;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 600;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
 
@@ -205,7 +211,8 @@
       color: var(--muted);
       font-size: 0.73rem;
       line-height: 1.2;
-      margin-top: 2px;
+      margin-top: 0;
+      overflow-wrap: anywhere;
     }
 
     .file-link-counts,
@@ -214,6 +221,10 @@
       font-size: 0.74rem;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       white-space: nowrap;
+    }
+
+    .file-link-counts {
+      align-self: center;
     }
 
     #review-content {
@@ -599,7 +610,9 @@ __REVIEW_DATA_JSON__
           const link = document.createElement('a');
           link.className = 'file-link';
           link.href = `#${file.id}`;
-          link.style.setProperty('--depth', String(getPathDepth(file.path)));
+
+          const navPath = file.path || file.newPath || file.oldPath || '(unknown path)';
+          const pathParts = splitPathParts(navPath);
 
           const status = document.createElement('span');
           status.className = 'file-link-status';
@@ -611,11 +624,13 @@ __REVIEW_DATA_JSON__
 
           const path = document.createElement('span');
           path.className = 'file-link-path';
-          path.textContent = file.path || '(unknown path)';
+          path.textContent = pathParts.name;
+          path.title = navPath;
 
           const meta = document.createElement('span');
           meta.className = 'file-link-meta';
-          meta.textContent = formatStatus(file.status);
+          meta.textContent = buildNavMeta(file, pathParts.dir);
+          if (!meta.textContent) meta.hidden = true;
 
           const counts = document.createElement('span');
           counts.className = 'file-link-counts';
@@ -623,6 +638,7 @@ __REVIEW_DATA_JSON__
 
           main.append(path, meta);
           link.append(status, main, counts);
+          link.title = navPath;
           link.addEventListener('click', () => {
             setFileCollapsed(file.id, false, true);
             window.setTimeout(() => flashFile(file.id), 10);
@@ -942,9 +958,19 @@ __REVIEW_DATA_JSON__
         return row.newLineNo != null ? row.newLineNo : (row.oldLineNo != null ? row.oldLineNo : '-');
       }
 
-      function getPathDepth(filePath) {
-        if (!filePath) return 0;
-        return Math.max(0, filePath.split('/').length - 1);
+      function splitPathParts(filePath) {
+        if (!filePath) return { dir: '', name: '(unknown path)' };
+        const normalized = String(filePath).replace(/\/+$/, '');
+        const slashIndex = normalized.lastIndexOf('/');
+        if (slashIndex === -1) return { dir: '', name: normalized || '(unknown path)' };
+        return {
+          dir: normalized.slice(0, slashIndex),
+          name: normalized.slice(slashIndex + 1) || normalized,
+        };
+      }
+
+      function buildNavMeta(file, dir) {
+        return dir || formatStatus(file.status);
       }
 
       function flashFile(fileId) {
