@@ -1,0 +1,1578 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Miru workflow graph</title>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --black: #000000;
+      --bone: #eae1d0;
+      --onyx: #12110e;
+      --tiger-flame: #f05d23;
+      --dusty-lavender: #70566d;
+      --bg: var(--black);
+      --surface: var(--onyx);
+      --surface-2: #0d0c0a;
+      --surface-3: var(--black);
+      --border: rgba(234, 225, 208, 0.14);
+      --border-strong: rgba(234, 225, 208, 0.22);
+      --fg: var(--bone);
+      --muted: rgba(234, 225, 208, 0.62);
+      --accent: var(--tiger-flame);
+      --accent-fg: var(--bg);
+      --danger: var(--tiger-flame);
+      --comment: rgba(234, 225, 208, 0.18);
+      --muted-soft: rgba(234, 225, 208, 0.05);
+      --accent-soft: rgba(240, 93, 35, 0.14);
+      --selection-soft: rgba(234, 225, 208, 0.18);
+      --graph-edge: rgba(112, 86, 109, 0.72);
+      --graph-node-stroke: rgba(234, 225, 208, 0.16);
+      --graph-node-fill: rgba(18, 17, 14, 0.98);
+      --graph-node-meta: rgba(234, 225, 208, 0.58);
+      --focus-bg: rgba(240, 93, 35, 0.10);
+      --radius: 6px;
+    }
+
+    * {
+      box-sizing: border-box;
+      scrollbar-color: var(--border-strong) transparent;
+    }
+
+    html {
+      height: 100%;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+    }
+
+    ::selection {
+      background: var(--selection-soft);
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    button {
+      font: inherit;
+      padding: 3px 7px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: var(--surface-2);
+      color: var(--fg);
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1.15;
+    }
+
+    button:hover {
+      background: var(--accent-soft);
+    }
+
+    button:focus-visible,
+    .file-tab:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      height: 100vh;
+      max-width: 1880px;
+      margin: 0 auto;
+      padding: 8px 10px 14px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.15;
+    }
+
+    .meta {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.3;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.92fr) minmax(480px, 1.28fr);
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+      align-items: stretch;
+    }
+
+    .pane {
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .pane-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .pane-title {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.15;
+      font-weight: 700;
+    }
+
+    .pane-meta {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.25;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .pane-actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .detail-strip {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-height: 45px;
+      padding: 5px 8px 6px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .detail-title {
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 600;
+      color: var(--fg);
+      overflow-wrap: anywhere;
+    }
+
+    .detail-meta {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.25;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .graph-viewport {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--bg);
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .graph-viewport.is-panning {
+      cursor: grabbing;
+    }
+
+    .graph-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at top left, rgba(240, 93, 35, 0.05), transparent 34%), var(--bg);
+      user-select: none;
+    }
+
+    .edge,
+    .node {
+      cursor: pointer;
+      outline: none;
+    }
+
+    .edge-path {
+      fill: none;
+      stroke: var(--graph-edge);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+      stroke-linecap: round;
+    }
+
+    .edge.is-active .edge-path {
+      stroke: var(--accent);
+      stroke-width: 2.2;
+    }
+
+    .edge-label-box {
+      fill: rgba(0, 0, 0, 0.92);
+      stroke: rgba(234, 225, 208, 0.12);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .edge.is-active .edge-label-box {
+      stroke: rgba(240, 93, 35, 0.4);
+      fill: rgba(240, 93, 35, 0.18);
+    }
+
+    .edge-label-text {
+      fill: var(--muted);
+      font-size: 9px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      pointer-events: none;
+    }
+
+    .edge.is-active .edge-label-text {
+      fill: var(--fg);
+    }
+
+    .node-rect {
+      fill: var(--graph-node-fill);
+      stroke: var(--graph-node-stroke);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .node-accent {
+      fill: rgba(240, 93, 35, 0.78);
+    }
+
+    .node-kind,
+    .node-file,
+    .node-range,
+    .node-label {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      pointer-events: none;
+    }
+
+    .node-label {
+      fill: var(--fg);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .node-kind,
+    .node-range {
+      fill: var(--graph-node-meta);
+      font-size: 9px;
+    }
+
+    .node-file {
+      fill: rgba(234, 225, 208, 0.8);
+      font-size: 9px;
+    }
+
+    .node-badge-box {
+      fill: rgba(240, 93, 35, 0.18);
+      stroke: rgba(240, 93, 35, 0.34);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .node-badge-text {
+      fill: var(--fg);
+      font-size: 8px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      pointer-events: none;
+    }
+
+    .node.is-linked .node-rect {
+      stroke: rgba(240, 93, 35, 0.48);
+      fill: rgba(240, 93, 35, 0.08);
+    }
+
+    .node.is-active .node-rect {
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      fill: rgba(240, 93, 35, 0.10);
+    }
+
+    .node:focus-visible .node-rect {
+      stroke: var(--accent);
+      stroke-width: 1.5;
+    }
+
+    .viewer-card {
+      min-width: 0;
+    }
+
+    .viewer-head {
+      flex-shrink: 0;
+    }
+
+    .viewer-head-main {
+      min-width: 0;
+    }
+
+    .file-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 5px 6px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+      overflow-x: auto;
+      overflow-y: hidden;
+      min-height: 36px;
+    }
+
+    .file-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+      max-width: 100%;
+      padding: 4px 7px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1.1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      white-space: nowrap;
+    }
+
+    .file-tab:hover {
+      background: var(--muted-soft);
+      color: var(--fg);
+    }
+
+    .file-tab.is-active {
+      border-color: rgba(240, 93, 35, 0.4);
+      background: var(--accent-soft);
+      color: var(--fg);
+    }
+
+    .file-tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 15px;
+      height: 15px;
+      padding: 0 4px;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      font-size: 9px;
+      line-height: 1;
+      color: var(--muted);
+      background: var(--surface-3);
+      font-weight: 700;
+    }
+
+    .file-tab.is-active .file-tab-badge {
+      border-color: rgba(240, 93, 35, 0.38);
+      color: var(--fg);
+    }
+
+    .viewer-body {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      background: var(--bg);
+    }
+
+    .file-panel {
+      display: none;
+      height: 100%;
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    .file-panel.is-active {
+      display: block;
+    }
+
+    .viewer-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-width: 100%;
+    }
+
+    .viewer-line {
+      padding: 0 6px 1px;
+      border-top: 1px solid rgba(234, 225, 208, 0.04);
+      background: var(--bg);
+    }
+
+    .viewer-line:first-child {
+      border-top: 0;
+    }
+
+    .viewer-line.is-focus {
+      background: var(--focus-bg);
+    }
+
+    .viewer-line.is-focus-start {
+      box-shadow: inset 2px 0 0 0 var(--accent);
+    }
+
+    .viewer-line-main {
+      display: grid;
+      grid-template-columns: 5ch minmax(0, 1fr);
+      align-items: start;
+      gap: 8px;
+    }
+
+    .viewer-line-number {
+      color: var(--muted);
+      text-align: right;
+      padding-top: 1px;
+      user-select: none;
+      font-size: 10px;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .viewer-line.is-focus .viewer-line-number {
+      color: var(--fg);
+    }
+
+    .viewer-code-wrap {
+      margin: 0;
+      min-height: 1.1em;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.22;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      color: var(--fg);
+    }
+
+    .viewer-code-wrap code {
+      display: block;
+      margin: 0;
+      padding: 0 !important;
+      background: transparent !important;
+      white-space: inherit;
+      word-break: inherit;
+      font: inherit;
+      color: inherit;
+    }
+
+    .viewer-code-wrap code.hljs {
+      padding: 0 !important;
+      background: transparent !important;
+    }
+
+    .empty-state {
+      padding: 8px 10px;
+      color: var(--muted);
+      white-space: pre-wrap;
+      font-size: 11px;
+      line-height: 1.35;
+      background: var(--surface);
+    }
+
+    .hljs {
+      color: var(--fg);
+      background: transparent;
+    }
+
+    .hljs-comment,
+    .hljs-quote {
+      color: var(--muted);
+    }
+
+    .hljs-keyword,
+    .hljs-selector-tag,
+    .hljs-literal,
+    .hljs-section,
+    .hljs-link {
+      color: #f6b073;
+    }
+
+    .hljs-string,
+    .hljs-doctag,
+    .hljs-regexp,
+    .hljs-addition,
+    .hljs-attribute,
+    .hljs-template-tag {
+      color: #d8c699;
+    }
+
+    .hljs-number,
+    .hljs-symbol,
+    .hljs-bullet,
+    .hljs-meta,
+    .hljs-meta-string {
+      color: #d58a61;
+    }
+
+    .hljs-title,
+    .hljs-title.class_,
+    .hljs-title.function_,
+    .hljs-function .hljs-title,
+    .hljs-name,
+    .hljs-selector-id,
+    .hljs-selector-class {
+      color: #f0c18c;
+    }
+
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-built_in,
+    .hljs-type,
+    .hljs-params,
+    .hljs-property,
+    .hljs-subst {
+      color: #b89ab5;
+    }
+
+    .hljs-emphasis {
+      font-style: italic;
+    }
+
+    .hljs-strong {
+      font-weight: 700;
+    }
+
+    @media (max-width: 1080px) {
+      body {
+        overflow: auto;
+      }
+
+      main {
+        height: auto;
+      }
+
+      .shell {
+        grid-template-columns: 1fr;
+        flex: none;
+        min-height: auto;
+      }
+
+      .graph-viewport {
+        min-height: 420px;
+      }
+
+      .viewer-card {
+        min-height: 420px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+
+      .viewer-line-main {
+        grid-template-columns: 4ch minmax(0, 1fr);
+        gap: 6px;
+      }
+
+      .graph-viewport {
+        min-height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1 id="workflow-title">Miru workflow graph</h1>
+        <div id="workflow-meta" class="meta"></div>
+      </div>
+    </header>
+
+    <div class="shell">
+      <section class="pane graph-card" aria-label="Workflow graph pane">
+        <div class="pane-head">
+          <div>
+            <div class="pane-title">Workflow graph</div>
+            <div id="graph-summary" class="pane-meta"></div>
+          </div>
+          <div class="pane-actions">
+            <button id="fit-button" type="button">Fit</button>
+            <button id="reset-button" type="button">100%</button>
+          </div>
+        </div>
+        <div id="graph-detail" class="detail-strip">
+          <div id="graph-detail-title" class="detail-title"></div>
+          <div id="graph-detail-meta" class="detail-meta"></div>
+        </div>
+        <div id="graph-empty" class="empty-state" hidden></div>
+        <div id="graph-viewport" class="graph-viewport" aria-label="Workflow graph viewport">
+          <svg id="graph-svg" class="graph-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workflow graph">
+            <defs>
+              <marker id="edge-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(112, 86, 109, 0.72)"></path>
+              </marker>
+            </defs>
+            <g id="graph-content"></g>
+          </svg>
+        </div>
+      </section>
+
+      <section class="pane viewer-card" aria-label="File viewer pane">
+        <div class="pane-head viewer-head">
+          <div class="viewer-head-main">
+            <div class="pane-title">File viewer</div>
+            <div id="viewer-meta" class="pane-meta"></div>
+          </div>
+        </div>
+        <div id="file-tabs" class="file-tabs" aria-label="Embedded files"></div>
+        <div id="viewer-empty" class="empty-state" hidden></div>
+        <div id="viewer-body" class="viewer-body"></div>
+      </section>
+    </div>
+  </main>
+
+  <script id="workflow-data" type="application/json">
+__WORKFLOW_DATA_JSON__
+  </script>
+  <script>
+    (() => {
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      const data = JSON.parse(document.getElementById('workflow-data').textContent);
+      const titleEl = document.getElementById('workflow-title');
+      const metaEl = document.getElementById('workflow-meta');
+      const graphSummaryEl = document.getElementById('graph-summary');
+      const graphDetailTitleEl = document.getElementById('graph-detail-title');
+      const graphDetailMetaEl = document.getElementById('graph-detail-meta');
+      const graphViewportEl = document.getElementById('graph-viewport');
+      const graphSvgEl = document.getElementById('graph-svg');
+      const graphContentEl = document.getElementById('graph-content');
+      const graphEmptyEl = document.getElementById('graph-empty');
+      const fitButton = document.getElementById('fit-button');
+      const resetButton = document.getElementById('reset-button');
+      const viewerMetaEl = document.getElementById('viewer-meta');
+      const fileTabsEl = document.getElementById('file-tabs');
+      const viewerBodyEl = document.getElementById('viewer-body');
+      const viewerEmptyEl = document.getElementById('viewer-empty');
+
+      const workflowTitle = data.title || 'Workflow graph';
+      const workflowQuestion = data.question || '';
+      const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+      const edges = Array.isArray(data.edges) ? data.edges : [];
+      const files = Array.isArray(data.files) ? data.files : [];
+      const layout = data.layout && typeof data.layout === 'object' ? data.layout : { width: 960, height: 520 };
+      const summary = data.summary || { nodeCount: nodes.length, edgeCount: edges.length, fileCount: files.length };
+      const nodeById = new Map(nodes.map((node) => [node.id, node]));
+      const edgeById = new Map(edges.map((edge) => [edge.id, edge]));
+      const fileByPath = new Map(files.map((file) => [file.path, file]));
+      const graphNodeEls = new Map();
+      const graphEdgeEls = new Map();
+      const filePanelEls = new Map();
+      const fileLineEls = new Map();
+      const fileTabEls = new Map();
+      const storageKey = getStorageKey();
+      const storedState = loadStoredState();
+      const interaction = {
+        panning: false,
+        startX: 0,
+        startY: 0,
+        originX: 0,
+        originY: 0,
+      };
+      const state = {
+        activeNodeId: '',
+        activeEdgeId: '',
+        activeFilePath: '',
+        focusModeByNode: storedState.focusModeByNode && typeof storedState.focusModeByNode === 'object' ? storedState.focusModeByNode : {},
+        transform: isValidTransform(storedState.transform) ? storedState.transform : null,
+      };
+
+      titleEl.textContent = workflowTitle;
+      document.title = `${workflowTitle} · Miru workflow graph`;
+
+      const metaLines = [];
+      if (workflowQuestion) metaLines.push(`Question: ${workflowQuestion}`);
+      if (data.generatedAt) metaLines.push(`Generated: ${String(data.generatedAt).replace('_', ' ')}`);
+      if (data.sourcePath) metaLines.push(`Source: ${data.sourcePath}`);
+      metaLines.push(`Summary: ${summary.nodeCount || nodes.length} nodes, ${summary.edgeCount || edges.length} edges, ${summary.fileCount || files.length} files`);
+      metaEl.textContent = metaLines.join('\n');
+
+      graphSummaryEl.textContent = `${summary.nodeCount || nodes.length} nodes · ${summary.edgeCount || edges.length} edges · ${summary.fileCount || files.length} files · wheel zoom · drag pan`;
+
+      renderTabs(files);
+      renderFilePanels(files);
+      renderGraph(nodes, edges);
+      bindGraphInteractions();
+      applyInitialState();
+      window.addEventListener('load', () => {
+        syncGraphViewport();
+        if (!state.transform) fitGraph(false);
+        highlightVisibleFile();
+      });
+      window.addEventListener('resize', () => {
+        syncGraphViewport();
+        if (!state.transform) fitGraph(false);
+      });
+
+      fitButton.addEventListener('click', () => fitGraph(true));
+      resetButton.addEventListener('click', () => resetGraphScale(true));
+
+      function getStorageKey() {
+        const pathPart = window.location.pathname || data.sourcePath || workflowTitle;
+        return `miru-workflow-state:${pathPart}`;
+      }
+
+      function loadStoredState() {
+        try {
+          const raw = window.localStorage.getItem(storageKey);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_error) {
+          return {};
+        }
+      }
+
+      function saveState() {
+        try {
+          const payload = {
+            version: 1,
+            title: workflowTitle,
+            sourcePath: data.sourcePath || '',
+            updatedAt: new Date().toISOString(),
+            activeNodeId: state.activeNodeId || '',
+            activeEdgeId: state.activeEdgeId || '',
+            activeFilePath: state.activeFilePath || '',
+            focusModeByNode: state.focusModeByNode,
+            transform: state.transform,
+          };
+          window.localStorage.setItem(storageKey, JSON.stringify(payload));
+        } catch (_error) {
+          // Ignore persistence errors.
+        }
+      }
+
+      function applyInitialState() {
+        const storedNodeId = storedState.activeNodeId && nodeById.has(storedState.activeNodeId) ? storedState.activeNodeId : '';
+        const storedFilePath = storedState.activeFilePath && fileByPath.has(storedState.activeFilePath) ? storedState.activeFilePath : '';
+        const storedEdgeId = storedState.activeEdgeId && edgeById.has(storedState.activeEdgeId) ? storedState.activeEdgeId : '';
+        const initialSelection = data.initialSelection && typeof data.initialSelection === 'object' ? data.initialSelection : {};
+        const initialNodeId = initialSelection.nodeId && nodeById.has(initialSelection.nodeId) ? initialSelection.nodeId : '';
+        const initialFilePath = initialSelection.filePath && fileByPath.has(initialSelection.filePath) ? initialSelection.filePath : '';
+
+        syncGraphViewport();
+        if (state.transform) applyTransform(state.transform, false);
+        else fitGraph(false);
+
+        if (storedNodeId) {
+          selectNode(storedNodeId, { fromClick: false, save: false });
+        } else if (initialNodeId) {
+          selectNode(initialNodeId, { fromClick: false, save: false });
+        } else if (storedFilePath) {
+          selectFile(storedFilePath, { clearNode: true, save: false });
+        } else if (initialFilePath) {
+          selectFile(initialFilePath, { clearNode: true, save: false });
+        } else if (nodes.length) {
+          selectNode(nodes[0].id, { fromClick: false, save: false });
+        } else if (files.length) {
+          selectFile(files[0].path, { clearNode: true, save: false });
+        } else {
+          updateGraphDetail();
+          updateViewer();
+        }
+
+        if (storedEdgeId) {
+          state.activeEdgeId = storedEdgeId;
+          updateGraphSelection();
+          updateGraphDetail();
+        }
+      }
+
+      function renderGraph(graphNodes, graphEdges) {
+        graphContentEl.innerHTML = '';
+        graphNodeEls.clear();
+        graphEdgeEls.clear();
+
+        if (!graphNodes.length) {
+          graphEmptyEl.hidden = false;
+          graphEmptyEl.textContent = 'No workflow nodes were embedded in this artifact.';
+          graphViewportEl.hidden = true;
+          return;
+        }
+
+        graphEmptyEl.hidden = true;
+        graphViewportEl.hidden = false;
+
+        syncGraphViewport();
+
+        const edgeLayer = createSvgElement('g', { class: 'edge-layer' });
+        const nodeLayer = createSvgElement('g', { class: 'node-layer' });
+
+        graphEdges.forEach((edge) => {
+          const source = nodeById.get(edge.from);
+          const target = nodeById.get(edge.to);
+          if (!source || !target) return;
+
+          const pathInfo = buildEdgePath(source, target);
+          const edgeEl = createSvgElement('g', {
+            class: 'edge',
+            'data-edge-id': edge.id,
+            tabindex: '0',
+            role: 'button',
+          });
+
+          edgeEl.append(
+            createSvgElement('path', {
+              class: 'edge-path',
+              d: pathInfo.path,
+              'marker-end': 'url(#edge-arrow)',
+            }),
+          );
+
+          const labelText = truncateText(edge.kind || 'flows-to', 18);
+          const labelWidth = Math.max(34, labelText.length * 6.2 + 12);
+          const labelHeight = 16;
+          const labelX = pathInfo.labelX - labelWidth / 2;
+          const labelY = pathInfo.labelY - labelHeight / 2;
+          const labelGroup = createSvgElement('g', { class: 'edge-label' });
+          labelGroup.append(
+            createSvgElement('rect', {
+              class: 'edge-label-box',
+              x: String(labelX),
+              y: String(labelY),
+              width: String(labelWidth),
+              height: String(labelHeight),
+              rx: '8',
+              ry: '8',
+            }),
+          );
+          const textEl = createSvgElement('text', {
+            class: 'edge-label-text',
+            x: String(pathInfo.labelX),
+            y: String(pathInfo.labelY + 3),
+            'text-anchor': 'middle',
+          });
+          textEl.textContent = labelText;
+          labelGroup.append(textEl);
+          edgeEl.append(labelGroup);
+
+          const title = createSvgElement('title');
+          title.textContent = buildEdgeTitle(edge, source, target);
+          edgeEl.append(title);
+
+          edgeEl.addEventListener('click', (event) => {
+            event.stopPropagation();
+            selectEdge(edge.id, true);
+          });
+
+          edgeEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            selectEdge(edge.id, true);
+          });
+
+          edgeLayer.append(edgeEl);
+          graphEdgeEls.set(edge.id, edgeEl);
+        });
+
+        graphNodes.forEach((node) => {
+          const nodeEl = createSvgElement('g', {
+            class: 'node',
+            'data-node-id': node.id,
+            tabindex: '0',
+            role: 'button',
+            transform: `translate(${node.x || 0} ${node.y || 0})`,
+          });
+
+          nodeEl.append(
+            createSvgElement('rect', {
+              class: 'node-rect',
+              x: '0',
+              y: '0',
+              width: String(node.width || layout.nodeWidth || 248),
+              height: String(node.height || layout.nodeHeight || 76),
+              rx: '8',
+              ry: '8',
+            }),
+          );
+
+          nodeEl.append(
+            createSvgElement('rect', {
+              class: 'node-accent',
+              x: '0',
+              y: '0',
+              width: '3',
+              height: String(node.height || layout.nodeHeight || 76),
+              rx: '8',
+              ry: '8',
+            }),
+          );
+
+          const labelEl = createSvgElement('text', {
+            class: 'node-label',
+            x: '10',
+            y: '18',
+          });
+          labelEl.textContent = truncateText(node.label || node.id, 31);
+          nodeEl.append(labelEl);
+
+          const kindMeta = [node.kind || 'step'];
+          if (node.group) kindMeta.push(node.group);
+          const kindEl = createSvgElement('text', {
+            class: 'node-kind',
+            x: '10',
+            y: '34',
+          });
+          kindEl.textContent = truncateText(kindMeta.join(' · '), 35);
+          nodeEl.append(kindEl);
+
+          const fileEl = createSvgElement('text', {
+            class: 'node-file',
+            x: '10',
+            y: '52',
+          });
+          fileEl.textContent = truncateText(splitPathParts(node.filePath).name || '(no file)', 34);
+          nodeEl.append(fileEl);
+
+          const rangeEl = createSvgElement('text', {
+            class: 'node-range',
+            x: String((node.width || layout.nodeWidth || 248) - 10),
+            y: '66',
+            'text-anchor': 'end',
+          });
+          rangeEl.textContent = formatLineRangeShort(node.lineStart, node.lineEnd);
+          nodeEl.append(rangeEl);
+
+          if (Number(node.omittedCount) > 0) {
+            const omittedLabel = `+${Number(node.omittedCount)}`;
+            const badgeWidth = Math.max(18, omittedLabel.length * 5.8 + 10);
+            const badgeX = (node.width || layout.nodeWidth || 248) - badgeWidth - 8;
+            nodeEl.append(
+              createSvgElement('rect', {
+                class: 'node-badge-box',
+                x: String(badgeX),
+                y: '8',
+                width: String(badgeWidth),
+                height: '14',
+                rx: '7',
+                ry: '7',
+              }),
+            );
+
+            const badgeText = createSvgElement('text', {
+              class: 'node-badge-text',
+              x: String(badgeX + badgeWidth / 2),
+              y: '18',
+              'text-anchor': 'middle',
+            });
+            badgeText.textContent = omittedLabel;
+            nodeEl.append(badgeText);
+          }
+
+          const title = createSvgElement('title');
+          title.textContent = buildNodeTitle(node);
+          nodeEl.append(title);
+
+          nodeEl.addEventListener('click', (event) => {
+            event.stopPropagation();
+            selectNode(node.id, { fromClick: true, save: true });
+          });
+
+          nodeEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            selectNode(node.id, { fromClick: true, save: true });
+          });
+
+          nodeLayer.append(nodeEl);
+          graphNodeEls.set(node.id, nodeEl);
+        });
+
+        graphContentEl.append(edgeLayer, nodeLayer);
+      }
+
+      function renderTabs(embeddedFiles) {
+        fileTabsEl.innerHTML = '';
+        fileTabEls.clear();
+
+        if (!embeddedFiles.length) {
+          fileTabsEl.hidden = true;
+          return;
+        }
+
+        fileTabsEl.hidden = false;
+
+        embeddedFiles.forEach((file) => {
+          const parts = splitPathParts(file.path);
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'file-tab';
+          button.title = file.path;
+          button.setAttribute('aria-label', `Open ${file.path}`);
+
+          const label = document.createElement('span');
+          label.textContent = truncateText(parts.name || file.path, 28);
+
+          const badge = document.createElement('span');
+          badge.className = 'file-tab-badge';
+          badge.textContent = String(file.lineCount == null ? countLines(file.content) : file.lineCount);
+          badge.title = `${badge.textContent} lines`;
+
+          button.append(label, badge);
+          button.addEventListener('click', () => {
+            selectFile(file.path, { clearNode: true, save: true });
+          });
+
+          fileTabsEl.append(button);
+          fileTabEls.set(file.path, button);
+        });
+      }
+
+      function renderFilePanels(embeddedFiles) {
+        viewerBodyEl.innerHTML = '';
+        filePanelEls.clear();
+        fileLineEls.clear();
+
+        embeddedFiles.forEach((file) => {
+          const panel = document.createElement('section');
+          panel.className = 'file-panel';
+          panel.dataset.filePath = file.path;
+
+          const linesWrap = document.createElement('div');
+          linesWrap.className = 'viewer-lines';
+          const lineMap = new Map();
+          const lines = splitFileLines(file.content);
+
+          if (!lines.length) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'Empty file.';
+            panel.append(empty);
+          } else {
+            lines.forEach((lineText, index) => {
+              const lineNo = index + 1;
+              const lineEl = document.createElement('article');
+              lineEl.className = 'viewer-line';
+              lineEl.dataset.lineNo = String(lineNo);
+
+              const lineMain = document.createElement('div');
+              lineMain.className = 'viewer-line-main';
+
+              const number = document.createElement('div');
+              number.className = 'viewer-line-number';
+              number.textContent = String(lineNo);
+
+              const codeWrap = document.createElement('pre');
+              codeWrap.className = 'viewer-code-wrap';
+
+              const code = document.createElement('code');
+              code.dataset.highlightCode = '1';
+              if (file.language) code.className = `language-${file.language}`;
+              code.textContent = lineText.length ? lineText : ' ';
+
+              codeWrap.append(code);
+              lineMain.append(number, codeWrap);
+              lineEl.append(lineMain);
+              linesWrap.append(lineEl);
+              lineMap.set(lineNo, lineEl);
+            });
+
+            panel.append(linesWrap);
+          }
+
+          viewerBodyEl.append(panel);
+          filePanelEls.set(file.path, panel);
+          fileLineEls.set(file.path, lineMap);
+        });
+      }
+
+      function bindGraphInteractions() {
+        graphSvgEl.addEventListener('click', (event) => {
+          if (event.target.closest('[data-node-id]') || event.target.closest('[data-edge-id]')) return;
+          state.activeEdgeId = '';
+          updateGraphSelection();
+          updateGraphDetail();
+          saveState();
+        });
+
+        graphViewportEl.addEventListener('wheel', (event) => {
+          if (!nodes.length) return;
+          event.preventDefault();
+
+          const currentTransform = state.transform || fitTransform();
+          const scaleFactor = Math.exp(-event.deltaY * 0.0014);
+          const nextScale = clamp(currentTransform.scale * scaleFactor, 0.28, 2.6);
+          const rect = graphViewportEl.getBoundingClientRect();
+          const pointerX = event.clientX - rect.left;
+          const pointerY = event.clientY - rect.top;
+          const graphX = (pointerX - currentTransform.x) / currentTransform.scale;
+          const graphY = (pointerY - currentTransform.y) / currentTransform.scale;
+
+          applyTransform({
+            scale: nextScale,
+            x: pointerX - graphX * nextScale,
+            y: pointerY - graphY * nextScale,
+          }, true);
+        }, { passive: false });
+
+        graphViewportEl.addEventListener('pointerdown', (event) => {
+          if (event.button !== 0) return;
+          if (event.target.closest('[data-node-id]') || event.target.closest('[data-edge-id]')) return;
+          interaction.panning = true;
+          interaction.startX = event.clientX;
+          interaction.startY = event.clientY;
+          const currentTransform = state.transform || fitTransform();
+          interaction.originX = currentTransform.x;
+          interaction.originY = currentTransform.y;
+          graphViewportEl.classList.add('is-panning');
+          graphViewportEl.setPointerCapture(event.pointerId);
+        });
+
+        graphViewportEl.addEventListener('pointermove', (event) => {
+          if (!interaction.panning) return;
+          applyTransform({
+            scale: (state.transform || fitTransform()).scale,
+            x: interaction.originX + (event.clientX - interaction.startX),
+            y: interaction.originY + (event.clientY - interaction.startY),
+          }, true);
+        });
+
+        graphViewportEl.addEventListener('pointerup', (event) => {
+          if (!interaction.panning) return;
+          interaction.panning = false;
+          graphViewportEl.classList.remove('is-panning');
+          try {
+            graphViewportEl.releasePointerCapture(event.pointerId);
+          } catch (_error) {
+            // Ignore release errors.
+          }
+        });
+
+        graphViewportEl.addEventListener('pointercancel', () => {
+          interaction.panning = false;
+          graphViewportEl.classList.remove('is-panning');
+        });
+      }
+
+      function selectNode(nodeId, options = {}) {
+        const node = nodeById.get(nodeId);
+        if (!node) return;
+
+        const hasRange = node.lineStart != null || node.lineEnd != null;
+        const isRepeatClick = Boolean(options.fromClick) && state.activeNodeId === nodeId;
+
+        state.activeNodeId = nodeId;
+        state.activeFilePath = node.filePath || state.activeFilePath || '';
+        if (options.clearEdge !== false) state.activeEdgeId = '';
+
+        if (hasRange) {
+          if (isRepeatClick) {
+            state.focusModeByNode[nodeId] = !getNodeFocusMode(nodeId);
+          } else if (state.focusModeByNode[nodeId] == null) {
+            state.focusModeByNode[nodeId] = true;
+          }
+        }
+
+        if (node.filePath) {
+          showFile(node.filePath);
+          if (getNodeFocusMode(nodeId) && hasRange) {
+            scrollNodeRangeIntoView(node);
+          } else {
+            scrollFileTop(node.filePath);
+          }
+        } else {
+          updateViewer();
+        }
+
+        updateGraphSelection();
+        updateGraphDetail();
+        updateViewer();
+        if (options.save !== false) saveState();
+      }
+
+      function selectEdge(edgeId, shouldSave) {
+        if (!edgeById.has(edgeId)) return;
+        state.activeEdgeId = edgeId;
+        updateGraphSelection();
+        updateGraphDetail();
+        if (shouldSave !== false) saveState();
+      }
+
+      function selectFile(filePath, options = {}) {
+        if (!fileByPath.has(filePath)) {
+          state.activeFilePath = filePath || '';
+          if (options.clearNode) state.activeNodeId = '';
+          updateViewer();
+          updateGraphDetail();
+          updateGraphSelection();
+          if (options.save !== false) saveState();
+          return;
+        }
+
+        state.activeFilePath = filePath;
+        if (options.clearNode) state.activeNodeId = '';
+        showFile(filePath);
+        updateGraphSelection();
+        updateGraphDetail();
+        updateViewer();
+        if (options.save !== false) saveState();
+      }
+
+      function showFile(filePath) {
+        filePanelEls.forEach((panel, path) => {
+          panel.classList.toggle('is-active', path === filePath);
+        });
+
+        fileTabEls.forEach((tab, path) => {
+          tab.classList.toggle('is-active', path === filePath);
+        });
+
+        highlightVisibleFile();
+      }
+
+      function updateGraphSelection() {
+        graphNodeEls.forEach((nodeEl, nodeId) => {
+          const isActive = state.activeNodeId === nodeId;
+          let isLinked = false;
+
+          if (state.activeEdgeId) {
+            const edge = edgeById.get(state.activeEdgeId);
+            if (edge) {
+              isLinked = edge.from === nodeId || edge.to === nodeId;
+            }
+          }
+
+          nodeEl.classList.toggle('is-active', isActive);
+          nodeEl.classList.toggle('is-linked', !isActive && isLinked);
+        });
+
+        graphEdgeEls.forEach((edgeEl, edgeId) => {
+          edgeEl.classList.toggle('is-active', state.activeEdgeId === edgeId);
+        });
+      }
+
+      function updateGraphDetail() {
+        if (state.activeEdgeId && edgeById.has(state.activeEdgeId)) {
+          const edge = edgeById.get(state.activeEdgeId);
+          const source = nodeById.get(edge.from);
+          const target = nodeById.get(edge.to);
+          graphDetailTitleEl.textContent = `${source ? source.label : edge.from} — ${edge.kind || 'flows-to'} → ${target ? target.label : edge.to}`;
+          graphDetailMetaEl.textContent = edge.evidence || 'No edge evidence provided.';
+          return;
+        }
+
+        if (state.activeNodeId && nodeById.has(state.activeNodeId)) {
+          const node = nodeById.get(state.activeNodeId);
+          graphDetailTitleEl.textContent = `${node.label || node.id} · ${node.kind || 'step'}`;
+          const detailParts = [];
+          if (node.filePath) detailParts.push(node.filePath);
+          if (node.symbol && node.symbol !== node.label) detailParts.push(node.symbol);
+          if (formatLineRangeLong(node.lineStart, node.lineEnd)) detailParts.push(formatLineRangeLong(node.lineStart, node.lineEnd));
+          if (node.group) detailParts.push(`group: ${node.group}`);
+          if (Number(node.omittedCount) > 0) detailParts.push(`omits ~${Number(node.omittedCount)} helpers`);
+          graphDetailMetaEl.textContent = detailParts.join(' · ') || 'Click a node to open its file.';
+          return;
+        }
+
+        graphDetailTitleEl.textContent = workflowQuestion || 'Question-scoped workflow graph';
+        graphDetailMetaEl.textContent = 'Click a node to open its file. Click an edge to inspect the evidence for that handoff.';
+      }
+
+      function updateViewer() {
+        if (!files.length) {
+          viewerEmptyEl.hidden = false;
+          viewerEmptyEl.textContent = 'No files were embedded in this artifact.';
+          viewerBodyEl.hidden = true;
+          viewerMetaEl.textContent = 'No embedded files.';
+          return;
+        }
+
+        viewerBodyEl.hidden = false;
+
+        if (!state.activeFilePath || !fileByPath.has(state.activeFilePath)) {
+          viewerEmptyEl.hidden = false;
+          viewerEmptyEl.textContent = state.activeFilePath
+            ? `Embedded file not found in artifact: ${state.activeFilePath}`
+            : 'Click a node to open a file.';
+          viewerMetaEl.textContent = state.activeFilePath || 'No file selected.';
+          clearLineFocus();
+          return;
+        }
+
+        viewerEmptyEl.hidden = true;
+
+        const file = fileByPath.get(state.activeFilePath);
+        const metaParts = [file.path];
+        if (state.activeNodeId && nodeById.has(state.activeNodeId)) {
+          const node = nodeById.get(state.activeNodeId);
+          if (node.filePath === file.path) {
+            if (node.symbol || node.label) metaParts.push(node.symbol || node.label);
+            const rangeLabel = formatLineRangeLong(node.lineStart, node.lineEnd);
+            if (rangeLabel) metaParts.push(rangeLabel);
+          }
+        }
+        if (file.language) metaParts.push(`language: ${file.language}`);
+        metaParts.push(`${file.lineCount == null ? countLines(file.content) : file.lineCount} lines`);
+        viewerMetaEl.textContent = metaParts.join(' · ');
+
+        clearLineFocus();
+
+        if (state.activeNodeId && nodeById.has(state.activeNodeId)) {
+          const node = nodeById.get(state.activeNodeId);
+          if (node.filePath === file.path && getNodeFocusMode(node.id)) {
+            applyLineFocus(node);
+          }
+        }
+      }
+
+      function clearLineFocus() {
+        viewerBodyEl.querySelectorAll('.viewer-line.is-focus, .viewer-line.is-focus-start').forEach((lineEl) => {
+          lineEl.classList.remove('is-focus', 'is-focus-start');
+        });
+      }
+
+      function applyLineFocus(node) {
+        if (!node.filePath || !fileLineEls.has(node.filePath)) return;
+        const lineMap = fileLineEls.get(node.filePath);
+        if (!lineMap) return;
+
+        const start = node.lineStart == null ? node.lineEnd : node.lineStart;
+        const end = node.lineEnd == null ? start : node.lineEnd;
+        if (start == null || end == null) return;
+
+        for (let lineNo = start; lineNo <= end; lineNo += 1) {
+          const lineEl = lineMap.get(lineNo);
+          if (!lineEl) continue;
+          lineEl.classList.add('is-focus');
+          if (lineNo === start) lineEl.classList.add('is-focus-start');
+        }
+      }
+
+      function scrollNodeRangeIntoView(node) {
+        if (!node.filePath || !fileLineEls.has(node.filePath)) return;
+        const lineMap = fileLineEls.get(node.filePath);
+        const start = node.lineStart == null ? node.lineEnd : node.lineStart;
+        if (start == null) return;
+        const lineEl = lineMap.get(start);
+        if (!lineEl) return;
+        lineEl.scrollIntoView({ block: 'center', inline: 'nearest' });
+      }
+
+      function scrollFileTop(filePath) {
+        const panel = filePanelEls.get(filePath);
+        if (!panel) return;
+        panel.scrollTop = 0;
+      }
+
+      function highlightVisibleFile() {
+        if (!window.hljs || typeof window.hljs.highlightElement !== 'function') return;
+        if (!state.activeFilePath || !filePanelEls.has(state.activeFilePath)) return;
+        const panel = filePanelEls.get(state.activeFilePath);
+        if (!panel) return;
+
+        panel.querySelectorAll('code[data-highlight-code]').forEach((codeEl) => {
+          if (codeEl.dataset.hljsDone === '1') return;
+          if (!codeEl.className || !codeEl.className.includes('language-')) return;
+          try {
+            window.hljs.highlightElement(codeEl);
+            codeEl.dataset.hljsDone = '1';
+          } catch (_error) {
+            // Leave as plain code.
+          }
+        });
+      }
+
+      function syncGraphViewport() {
+        const rect = graphViewportEl.getBoundingClientRect();
+        const width = Math.max(Math.round(rect.width), 1);
+        const height = Math.max(Math.round(rect.height), 1);
+        graphSvgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        graphSvgEl.setAttribute('preserveAspectRatio', 'none');
+      }
+
+      function fitGraph(shouldSave) {
+        applyTransform(fitTransform(), shouldSave);
+      }
+
+      function resetGraphScale(shouldSave) {
+        const rect = graphViewportEl.getBoundingClientRect();
+        const width = Math.max(layout.width || 0, 1);
+        const height = Math.max(layout.height || 0, 1);
+        const x = width < rect.width ? (rect.width - width) / 2 : 16;
+        const y = height < rect.height ? (rect.height - height) / 2 : 16;
+        applyTransform({ scale: 1, x, y }, shouldSave);
+      }
+
+      function fitTransform() {
+        const rect = graphViewportEl.getBoundingClientRect();
+        const width = Math.max(layout.width || 0, 1);
+        const height = Math.max(layout.height || 0, 1);
+        const availableWidth = Math.max(rect.width - 32, 1);
+        const availableHeight = Math.max(rect.height - 32, 1);
+        const scale = clamp(Math.min(availableWidth / width, availableHeight / height), 0.28, 1.4);
+        return {
+          scale,
+          x: (rect.width - width * scale) / 2,
+          y: (rect.height - height * scale) / 2,
+        };
+      }
+
+      function applyTransform(transform, shouldSave) {
+        const next = {
+          scale: clamp(Number(transform && transform.scale) || 1, 0.28, 2.6),
+          x: Number(transform && transform.x) || 0,
+          y: Number(transform && transform.y) || 0,
+        };
+
+        state.transform = next;
+        graphContentEl.setAttribute('transform', `translate(${next.x} ${next.y}) scale(${next.scale})`);
+        if (shouldSave !== false) saveState();
+      }
+
+      function getNodeFocusMode(nodeId) {
+        return state.focusModeByNode[nodeId] !== false;
+      }
+
+      function buildEdgePath(source, target) {
+        const sourceX = (source.x || 0) + (source.width || layout.nodeWidth || 248);
+        const sourceY = (source.y || 0) + (source.height || layout.nodeHeight || 76) / 2;
+        const targetX = target.x || 0;
+        const targetY = (target.y || 0) + (target.height || layout.nodeHeight || 76) / 2;
+        const delta = Math.max(36, Math.abs(targetX - sourceX) * 0.42);
+        const path = `M ${sourceX} ${sourceY} C ${sourceX + delta} ${sourceY}, ${targetX - delta} ${targetY}, ${targetX} ${targetY}`;
+        return {
+          path,
+          labelX: sourceX + (targetX - sourceX) / 2,
+          labelY: sourceY + (targetY - sourceY) / 2,
+        };
+      }
+
+      function buildNodeTitle(node) {
+        const parts = [node.label || node.id, node.kind || 'step'];
+        if (node.symbol && node.symbol !== node.label) parts.push(node.symbol);
+        if (node.filePath) parts.push(node.filePath);
+        const range = formatLineRangeLong(node.lineStart, node.lineEnd);
+        if (range) parts.push(range);
+        if (node.group) parts.push(`group: ${node.group}`);
+        if (Number(node.omittedCount) > 0) parts.push(`omits ~${Number(node.omittedCount)} helpers`);
+        return parts.join(' · ');
+      }
+
+      function buildEdgeTitle(edge, source, target) {
+        const parts = [`${source ? source.label : edge.from} -> ${target ? target.label : edge.to}`, edge.kind || 'flows-to'];
+        if (edge.evidence) parts.push(edge.evidence);
+        return parts.join(' · ');
+      }
+
+      function createSvgElement(tagName, attributes = {}) {
+        const element = document.createElementNS(SVG_NS, tagName);
+        Object.entries(attributes).forEach(([key, value]) => {
+          if (value == null) return;
+          element.setAttribute(key, value);
+        });
+        return element;
+      }
+
+      function splitPathParts(filePath) {
+        if (!filePath) return { dir: '', name: '' };
+        const normalized = String(filePath).replace(/\/+$/, '');
+        const slashIndex = normalized.lastIndexOf('/');
+        if (slashIndex === -1) return { dir: '', name: normalized };
+        return {
+          dir: normalized.slice(0, slashIndex),
+          name: normalized.slice(slashIndex + 1),
+        };
+      }
+
+      function truncateText(value, limit) {
+        const text = String(value == null ? '' : value);
+        if (text.length <= limit) return text;
+        return `${text.slice(0, Math.max(0, limit - 1))}…`;
+      }
+
+      function splitFileLines(content) {
+        const normalized = String(content == null ? '' : content).replace(/\r\n/g, '\n');
+        const lines = normalized.split('\n');
+        if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+        return lines;
+      }
+
+      function countLines(content) {
+        return splitFileLines(content).length;
+      }
+
+      function formatLineRangeShort(start, end) {
+        if (start == null && end == null) return '';
+        const lineStart = start == null ? end : start;
+        const lineEnd = end == null ? lineStart : end;
+        if (lineStart === lineEnd) return `L${lineStart}`;
+        return `L${lineStart}-${lineEnd}`;
+      }
+
+      function formatLineRangeLong(start, end) {
+        if (start == null && end == null) return '';
+        const lineStart = start == null ? end : start;
+        const lineEnd = end == null ? lineStart : end;
+        if (lineStart === lineEnd) return `line ${lineStart}`;
+        return `lines ${lineStart}-${lineEnd}`;
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function isValidTransform(transform) {
+        return Boolean(
+          transform
+          && Number.isFinite(Number(transform.scale))
+          && Number.isFinite(Number(transform.x))
+          && Number.isFinite(Number(transform.y))
+        );
+      }
+    })();
+  </script>
+</body>
+</html>
